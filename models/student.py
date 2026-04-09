@@ -1,5 +1,7 @@
 """Modelo de estudiante y su expediente académico."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Dict, Set, List
 from enum import Enum

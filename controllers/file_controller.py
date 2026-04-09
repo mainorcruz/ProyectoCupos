@@ -1,5 +1,7 @@
 """Controlador para carga y procesamiento de archivos Excel de notas."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Tuple
 
@@ -11,6 +13,27 @@ from models.student import (
     Student,
     determine_status,
 )
+
+
+# Cursos de Arte y Repertorio: cualquiera de estas siglas equivale a ART100 o REP100
+_ART_CODES = {
+    "EG0124", "EG0125", "EG0126", "EG0127", "EG0128", "EG0129",
+    "EG0130", "EG0131", "EG0132", "EG0133", "EG0134", "EG0135",
+}
+_REP_CODES = {
+    "RP0013", "RP0017", "RP1109", "RP1111", "RP1112", "RP1113",
+    "RP1117", "RP1202", "RP1237",
+}
+
+
+def _normalize_code(code: str) -> str:
+    """Normaliza siglas de Cursos de Arte y Repertorio al código del plan."""
+    bare = code.replace(" ", "")
+    if bare in _ART_CODES:
+        return "ART100"
+    if bare in _REP_CODES:
+        return "REP100"
+    return code
 
 
 # Mapeo de columnas esperadas
@@ -138,7 +161,7 @@ class FileController:
             student_id, first_name, last1, last2, campus
         )
 
-        code = str(get("sigla") or "").strip().upper()
+        code = _normalize_code(str(get("sigla") or "").strip().upper())
         if not code:
             return
 

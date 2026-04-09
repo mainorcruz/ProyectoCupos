@@ -1,5 +1,7 @@
 """Modelo de plan de estudios."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 from models.course import Course
@@ -37,7 +39,7 @@ class StudyPlan:
         for course in self.courses.values():
             if course.code in approved or course.code in enrolled:
                 continue
-            if course.prerequisites_met(approved):
+            if course.prerequisites_met(approved | enrolled):
                 eligible.append(course)
         return eligible
 

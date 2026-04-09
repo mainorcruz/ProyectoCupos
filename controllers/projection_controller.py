@@ -1,5 +1,7 @@
 """Controlador de proyección de cupos basado en requisitos y expedientes."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
@@ -19,8 +21,8 @@ class CourseProjection:
 
     @property
     def projected_demand(self) -> int:
-        """Demanda proyectada = estudiantes elegibles que no lo han aprobado ni matriculado."""
-        return len(self.eligible_students)
+        """Demanda proyectada = estudiantes con el curso pendiente (no aprobado) que cumplen requisitos."""
+        return len(self.eligible_students) + len(self.currently_enrolled)
 
     @property
     def total_approved(self) -> int:
@@ -54,7 +56,7 @@ class ProjectionController:
                 projection.already_approved.append(student)
             elif course_code in enrolled:
                 projection.currently_enrolled.append(student)
-            elif course.prerequisites_met(approved):
+            elif course.prerequisites_met(approved | enrolled):
                 projection.eligible_students.append(student)
 
         return projection
