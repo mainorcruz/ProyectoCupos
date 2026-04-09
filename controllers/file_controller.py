@@ -15,25 +15,37 @@ from models.student import (
 )
 
 
-# Cursos de Arte y Repertorio: cualquiera de estas siglas equivale a ART100 o REP100
-_ART_CODES = {
-    "EG0124", "EG0125", "EG0126", "EG0127", "EG0128", "EG0129",
-    "EG0130", "EG0131", "EG0132", "EG0133", "EG0134", "EG0135",
+# Humanidades: EG0124 → CIH100, EG0125 → CIH200
+_CIH_MAP = {
+    "EG0124": "CIH100",
+    "EG0125": "CIH200",
 }
-_REP_CODES = {
-    "RP0013", "RP0017", "RP1109", "RP1111", "RP1112", "RP1113",
-    "RP1117", "RP1202", "RP1237",
+
+# Cursos de Arte: cualquiera de estas siglas equivale a ART100
+_ART_CODES = {
+    "EG0088", "EG0313", "EG0314", "EG0315", "EG0316", "EG0317",
+    "EG0318", "EG0319", "EG0321", "EG0323", "EG0324", "EG0325",
+    "EG0326", "EG0337",
 }
 
 
 def _normalize_code(code: str) -> str:
-    """Normaliza siglas de Cursos de Arte y Repertorio al código del plan."""
+    """Normaliza siglas del expediente al código del plan de estudios."""
     bare = code.replace(" ", "")
+    # Humanidades
+    if bare in _CIH_MAP:
+        return _CIH_MAP[bare]
+    # Arte
     if bare in _ART_CODES:
         return "ART100"
-    if bare in _REP_CODES:
+    # Repertorio: cualquier sigla que comience con RP
+    if bare.startswith("RP"):
         return "REP100"
-    return code
+    # Seminarios de Realidad Nacional: cualquier sigla que comience con SR
+    # SRN100 y SRN200 ya tienen el formato correcto; otros SR se asignan por número
+    if bare.startswith("SR") and bare not in ("SRN100", "SRN200"):
+        return "SRN200" if "2" in bare else "SRN100"
+    return bare
 
 
 # Mapeo de columnas esperadas

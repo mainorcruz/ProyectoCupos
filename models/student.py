@@ -61,6 +61,10 @@ class Student:
         return {r.code for r in self.records if r.status == CourseStatus.ENROLLED}
 
     @property
+    def enrolled_records(self) -> List[CourseRecord]:
+        return [r for r in self.records if r.status == CourseStatus.ENROLLED]
+
+    @property
     def failed_courses(self) -> Set[str]:
         return {r.code for r in self.records if r.status == CourseStatus.FAILED}
 

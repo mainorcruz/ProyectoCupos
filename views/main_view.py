@@ -178,7 +178,7 @@ class MainView:
 
         headings = {
             "code": ("Sigla", 80),
-            "name": ("Nombre del Curso", 260),
+            "name": ("Nombre del Curso  🔍", 260),
             "credits": ("Créd.", 50),
             "cycle": ("Ciclo", 50),
             "demand": ("Demanda", 80),
@@ -195,10 +195,18 @@ class MainView:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         vsb.pack(side=tk.RIGHT, fill=tk.Y)
 
+        self.tree.bind("<ButtonRelease-1>", self._on_tree_click)
+        self.tree.bind("<Motion>", self._on_tree_motion)
+
+        # Hint
+        ttk.Label(parent, text="Clic en el nombre del curso para ver la lista de estudiantes pendientes.",
+                  font=("Segoe UI", 8), foreground="#888",
+                  background=self.BG_COLOR).pack(anchor=tk.W, pady=(3, 0))
+
         # Summary bar
         self.summary_var = tk.StringVar(value="")
         ttk.Label(parent, textvariable=self.summary_var, font=("Segoe UI", 10, "bold"),
-                  foreground=self.PRIMARY, background=self.BG_COLOR).pack(anchor=tk.W, pady=(5, 0))
+                  foreground=self.PRIMARY, background=self.BG_COLOR).pack(anchor=tk.W, pady=(2, 0))
 
         self._last_projections: list = []
         self._sort_reverse = {}
@@ -369,6 +377,153 @@ class MainView:
             self.tree.move(k, "", idx)
 
         self._sort_reverse[col] = not reverse
+
+    def _on_tree_motion(self, event):
+        """Cambia el cursor a 'mano' cuando el mouse está sobre la columna de nombre."""
+        col = self.tree.identify_column(event.x)
+        region = self.tree.identify_region(event.x, event.y)
+        if region == "cell" and col == "#2":
+            self.tree.configure(cursor="hand2")
+        else:
+            self.tree.configure(cursor="")
+
+    def _on_tree_click(self, event):
+        """Abre ventana de detalle al hacer clic en el nombre del curso."""
+        if self.tree.identify_region(event.x, event.y) != "cell":
+            return
+        if self.tree.identify_column(event.x) != "#2":
+            return
+        row_id = self.tree.identify_row(event.y)
+        if not row_id:
+            return
+        course_code = self.tree.item(row_id, "values")[0]
+        proj = next((p for p in self._last_projections if p.course.code == course_code), None)
+        if proj:
+            self._show_student_detail(proj)
+
+    def _show_student_detail(self, proj):
+        """Muestra ventana con lista de estudiantes pendientes del curso y opción de exportar."""
+        students = sorted(proj.eligible_students, key=lambda s: s.student_id)
+
+        win = tk.Toplevel(self.root)
+        win.title(f"Estudiantes pendientes — {proj.course.code}")
+        win.geometry("620x480")
+        win.configure(bg=self.BG_COLOR)
+        win.transient(self.root)
+        win.grab_set()
+
+        # Header
+        header = tk.Frame(win, bg=self.PRIMARY, height=55)
+        header.pack(fill=tk.X)
+        header.pack_propagate(False)
+        tk.Label(header, text=f"{proj.course.code}  —  {proj.course.name}",
+                 font=("Segoe UI", 13, "bold"), fg="white", bg=self.PRIMARY
+                 ).pack(side=tk.LEFT, padx=15, pady=10)
+
+        # Barra resumen
+        summary_frame = tk.Frame(win, bg="#E8EEF2")
+        summary_frame.pack(fill=tk.X)
+        tk.Label(summary_frame,
+                 text=f"  Estudiantes pendientes: {len(students)}",
+                 font=("Segoe UI", 9, "bold"), bg="#E8EEF2", fg=self.PRIMARY, pady=6
+                 ).pack(side=tk.LEFT, padx=10)
+
+        # Tabla de estudiantes
+        table_frame = tk.Frame(win)
+        table_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(8, 4))
+
+        cols = ("id", "nombre", "apellido1", "apellido2")
+        tree = ttk.Treeview(table_frame, columns=cols, show="headings", selectmode="browse")
+
+        for col, text, width, anchor in [
+            ("id",        "Carné",      100, tk.CENTER),
+            ("nombre",    "Nombre",     150, tk.W),
+            ("apellido1", "Apellido 1", 150, tk.W),
+            ("apellido2", "Apellido 2", 150, tk.W),
+        ]:
+            tree.heading(col, text=text)
+            tree.column(col, width=width, anchor=anchor)
+
+        vsb = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        for student in students:
+            tree.insert("", tk.END, values=(
+                student.student_id, student.first_name,
+                student.last_name_1, student.last_name_2
+            ))
+
+        # Botón exportar
+        btn_frame = tk.Frame(win, bg=self.BG_COLOR)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(4, 10))
+        ttk.Button(
+            btn_frame, text="💾 Exportar a Excel",
+            command=lambda: self._export_student_list(proj, students)
+        ).pack(side=tk.RIGHT)
+
+    def _export_student_list(self, proj, students):
+        """Exporta la lista de estudiantes pendientes a Excel."""
+        path = filedialog.asksaveasfilename(
+            title="Guardar lista de estudiantes",
+            defaultextension=".xlsx",
+            initialfile=f"pendientes_{proj.course.code}.xlsx",
+            filetypes=[("Excel", "*.xlsx")]
+        )
+        if not path:
+            return
+
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Pendientes"
+
+            header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+            header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+            body_font   = Font(name="Calibri", size=11)
+            border = Border(
+                left=Side(style="thin"), right=Side(style="thin"),
+                top=Side(style="thin"),  bottom=Side(style="thin"),
+            )
+
+            # Título
+            ws.merge_cells("A1:D1")
+            ws["A1"].value = f"Estudiantes pendientes — {proj.course.code}: {proj.course.name}"
+            ws["A1"].font = Font(name="Calibri", size=13, bold=True, color="1F4E79")
+            ws["A1"].alignment = Alignment(horizontal="left")
+
+            ws["A2"].value = f"Total: {len(students)} estudiantes"
+            ws["A2"].font = Font(name="Calibri", size=10, italic=True)
+
+            # Encabezados
+            for col, text in enumerate(["Carné", "Nombre", "Apellido 1", "Apellido 2"], 1):
+                cell = ws.cell(row=4, column=col, value=text)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal="center")
+                cell.border = border
+
+            # Datos
+            for i, student in enumerate(students, 5):
+                for col, val in enumerate([
+                    student.student_id, student.first_name,
+                    student.last_name_1, student.last_name_2
+                ], 1):
+                    cell = ws.cell(row=i, column=col, value=val)
+                    cell.font = body_font
+                    cell.border = border
+
+            for i, w in enumerate([15, 20, 20, 20], 1):
+                ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+            wb.save(path)
+            messagebox.showinfo("Éxito", f"Lista exportada:\n{path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo exportar: {e}")
 
     def run(self):
         self.root.mainloop()

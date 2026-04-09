@@ -21,8 +21,8 @@ class CourseProjection:
 
     @property
     def projected_demand(self) -> int:
-        """Demanda proyectada = estudiantes con el curso pendiente (no aprobado) que cumplen requisitos."""
-        return len(self.eligible_students) + len(self.currently_enrolled)
+        """Demanda proyectada = estudiantes que necesitan cupo (no aprobado, no matriculado, cumplen requisitos)."""
+        return len(self.eligible_students)
 
     @property
     def total_approved(self) -> int:
@@ -39,6 +39,28 @@ class ProjectionController:
     def __init__(self, plan: StudyPlan, record: AcademicRecord):
         self.plan = plan
         self.record = record
+        self._current_period = self._detect_current_period()
+
+    def _detect_current_period(self) -> tuple:
+        """Detecta el (año, período) más reciente con cursos matriculados en el expediente."""
+        best = ("", "")
+        for student in self.record.students.values():
+            for r in student.enrolled_records:
+                candidate = (r.year or "", r.period or "")
+                if candidate > best:
+                    best = candidate
+        return best
+
+    def _student_is_active(self, student: Student) -> bool:
+        """True si el estudiante tiene cursos matriculados en el período más reciente detectado."""
+        year, period = self._current_period
+        if not year:
+            # Sin información de año, basta con tener algún curso matriculado
+            return bool(student.enrolled_courses)
+        return any(
+            (r.year or "") == year and ((not period) or (r.period or "") == period)
+            for r in student.enrolled_records
+        )
 
     def project_course(self, course_code: str) -> CourseProjection | None:
         """Proyecta la demanda de cupos para un curso específico."""
@@ -51,6 +73,10 @@ class ProjectionController:
         for student in self.record.students.values():
             approved = student.approved_courses
             enrolled = student.enrolled_courses
+
+            # Solo considerar estudiantes activos en el período más reciente
+            if not self._student_is_active(student):
+                continue
 
             if course_code in approved:
                 projection.already_approved.append(student)
