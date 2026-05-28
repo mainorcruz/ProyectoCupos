@@ -1,7 +1,7 @@
 """Punto de entrada de la aplicación de Proyección de Cupos.
 
 Bachillerato en Informática Empresarial — Universidad de Costa Rica
-Planes de estudio 01 y 07.
+Planes de estudio 01 y 07  hola mundo.
 """
 
 from views.main_view import MainView
